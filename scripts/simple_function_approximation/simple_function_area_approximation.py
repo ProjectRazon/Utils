@@ -10,7 +10,7 @@ FUNCTION_COLOR = ORANGE
 class SimpleFunctionApproximation(Scene):
     """
     An animation demonstrating the approximation of a non-negative
-    real function by a series of lines (representing the top of rectangles).
+    real function by a series of rectangles.
     
     This version features a custom "splitting" animation for a highly
     intuitive visualization of the refinement process.
@@ -46,11 +46,11 @@ class SimpleFunctionApproximation(Scene):
         self.add(axes, axis_labels, graph, graph_label)
         self.wait(1)
 
-        # 2. --- LINE CREATION LOGIC ---
-        def create_simple_function_lines(n, x_domain=[-8, 8], dx=0.001):
-            """Creates a VGroup of lines approximating the function for a given n."""
+        # 2. --- RECTANGLE CREATION LOGIC ---
+        def create_simple_function_rectangles(n, x_domain=[-8, 8], dx=0.001):
+            """Creates a VGroup of rectangles approximating the function for a given n."""
             simple_func = lambda x: np.floor(func_to_approximate(x) * n) / n
-            lines = VGroup()
+            rectangles = VGroup()
             x_values = np.arange(x_domain[0], x_domain[1] + dx, dx)
             
             colormap = cm.viridis_r
@@ -63,99 +63,98 @@ class SimpleFunctionApproximation(Scene):
                 new_y = simple_func(x_val)
                 if not np.isclose(new_y, current_y):
                     if current_y > 1e-6:
-                        start_point = axes.c2p(segment_start_x, current_y)
-                        end_point = axes.c2p(x_val, current_y)
-                        
-                        line = Line(
-                            start=start_point,
-                            end=end_point,
-                            stroke_width=5,
+                        rect_width = x_val - segment_start_x
+                        rect = Rectangle(
+                            width=axes.x_axis.unit_size * rect_width,
+                            height=axes.y_axis.unit_size * current_y,
+                            stroke_width=0,
+                            fill_opacity=1,
                             color=mcolors.to_hex(colormap(norm(current_y)))
                         )
-                        lines.add(line)
+                        rect.move_to(axes.c2p(segment_start_x, 0), aligned_edge=DL)
+                        rectangles.add(rect)
                     
                     segment_start_x = x_val
                     current_y = new_y
             
-            # Handle the last segment
             if current_y > 1e-6:
-                start_point = axes.c2p(segment_start_x, current_y)
-                end_point = axes.c2p(x_values[-1], current_y)
-                line = Line(
-                    start=start_point,
-                    end=end_point,
-                    stroke_width=5,
+                rect_width = x_values[-1] - segment_start_x
+                rect = Rectangle(
+                    width=axes.x_axis.unit_size * rect_width,
+                    height=axes.y_axis.unit_size * current_y,
+                    stroke_width=0,
+                    fill_opacity=1,
                     color=mcolors.to_hex(colormap(norm(current_y)))
                 )
-                lines.add(line)
+                rect.move_to(axes.c2p(segment_start_x, 0), aligned_edge=DL)
+                rectangles.add(rect)
 
-            return lines
+            return rectangles
 
         # 3. --- ANIMATION ---
         n_values = [1, 2, 4, 8, 16, 32]
         
         # --- Create and display the initial state (n=1) ---
         current_n = n_values[0]
-        current_approx_lines = create_simple_function_lines(current_n)
+        current_approx_rects = create_simple_function_rectangles(current_n)
         
+
         self.play(
-            FadeIn(current_approx_lines, shift=UP, lag_ratio=0.1)
+            FadeIn(current_approx_rects, shift=UP, lag_ratio=0.1)
         )
         self.wait(1.5)
 
         # --- Loop through n_values and create the custom splitting animation ---
         for i in range(1, len(n_values)):
             next_n = n_values[i]
-            next_approx_lines = create_simple_function_lines(next_n)
+            next_approx_rects = create_simple_function_rectangles(next_n)
 
             # --- CUSTOM SPLITTING ANIMATION LOGIC ---
             animations = []
             
-            # Keep track of new lines that have a "parent"
-            matched_new_lines = VGroup()
+            # Keep track of new rectangles that have a "parent"
+            matched_new_rects = VGroup()
 
-            # For each old line, find the new ones that fall inside it
-            for old_line in current_approx_lines:
+            # For each old rectangle, find the new ones that fall inside it
+            for old_rect in current_approx_rects:
                 children = VGroup()
-                old_line_x_center = old_line.get_center()[0]
-                old_line_width = old_line.get_width()
+                old_rect_x_center = old_rect.get_center()[0]
+                old_rect_width = old_rect.width
                 
-                # Find all new lines whose center is within the old one's span
-                for new_line in next_approx_lines:
-                    if abs(new_line.get_center()[0] - old_line_x_center) < old_line_width / 2:
-                        children.add(new_line)
+                # Find all new rectangles whose center is within the old one's span
+                for new_rect in next_approx_rects:
+                    if abs(new_rect.get_center()[0] - old_rect_x_center) < old_rect_width / 2:
+                        children.add(new_rect)
                 
                 if len(children) > 0:
-                    # To create the "splitting" effect, we transform the original
-                    # line into the first child, and copies of it into the
-                    # other children. This ensures the original is properly
-                    # removed by the animation itself.
-                    source_lines = VGroup(old_line)
-                    if len(children) > 1:
-                        source_lines.add(*[old_line.copy() for _ in range(len(children) - 1)])
-                    
-                    animations.append(ReplacementTransform(source_lines, children))
-                    matched_new_lines.add(*children)
+                    # Create copies of the old rectangle to serve as the source of the transform
+                    # This creates the visual effect of one object splitting into many
+                    old_rect_copies = VGroup(*[old_rect.copy() for _ in children])
+                    animations.append(ReplacementTransform(old_rect_copies, children))
+                    matched_new_rects.add(*children)
                 else:
-                    # If an old line has no children, it means the function
-                    # value dropped, so it should disappear.
-                    animations.append(FadeOut(old_line))
+                    # If an old rectangle has no children, it means the function
+                    # value dropped, so it should disappear
+                    animations.append(FadeOut(old_rect))
 
-            # Any new lines that were not matched have no parent
+            # Any new rectangles that were not matched have no parent
             # (e.g., the function rose from zero). These should just fade in.
-            unmatched_new_lines = VGroup(*[
-                r for r in next_approx_lines if r not in matched_new_lines
+            unmatched_new_rects = VGroup(*[
+                r for r in next_approx_rects if r not in matched_new_rects
             ])
-            if len(unmatched_new_lines) > 0:
-                animations.append(FadeIn(unmatched_new_lines))
+            if len(unmatched_new_rects) > 0:
+                animations.append(FadeIn(unmatched_new_rects))
 
-            # Play the splitting animation
+            # Remove the original rectangles from the scene before playing the transforms
+            self.remove(current_approx_rects)
+
+            # Play the splitting animation and the label update together
             self.play(
                 *animations,
                 run_time=2.0
             )
             self.wait(1.5)
             
-            current_approx_lines = next_approx_lines
+            current_approx_rects = next_approx_rects
             
         self.wait(3)
