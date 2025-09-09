@@ -99,11 +99,9 @@ class SimpleFunctionApproximation(Scene):
         current_n = n_values[0]
         current_approx_rects = create_simple_function_rectangles(current_n)
         
-        n_label = MathTex(f"n = {current_n}").to_corner(UL, buff=0.5)
 
         self.play(
-            FadeIn(current_approx_rects, shift=UP, lag_ratio=0.1),
-            Write(n_label)
+            FadeIn(current_approx_rects, shift=UP, lag_ratio=0.1)
         )
         self.wait(1.5)
 
@@ -111,7 +109,6 @@ class SimpleFunctionApproximation(Scene):
         for i in range(1, len(n_values)):
             next_n = n_values[i]
             next_approx_rects = create_simple_function_rectangles(next_n)
-            next_n_label = MathTex(f"n = {next_n}").to_corner(UL, buff=0.5)
 
             # --- CUSTOM SPLITTING ANIMATION LOGIC ---
             animations = []
@@ -155,7 +152,6 @@ class SimpleFunctionApproximation(Scene):
             # Play the splitting animation and the label update together
             self.play(
                 *animations,
-                Transform(n_label, next_n_label),
                 run_time=2.0
             )
             self.wait(1.5)
